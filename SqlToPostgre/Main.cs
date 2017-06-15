@@ -20,22 +20,28 @@ using Z.BulkOperations;
 
 namespace SqlToPostgre
 {
+    /* The code is the first version and clearly needs refactoring.
+     * Uses multiple threads to copy the tables from a sql server db to a postgresql db.
+     * Tried it on a 65Gb database and it took 4 hours and 30 min to move it.
+     * IMPORTANT NOTE : because I use the bulk-operations library, you need to update the nuget package Z.BulkOperations once a month. 
+     * After the update, the free use period will be extended until next month.  
+     * */
     public partial class Main : Form
     {
         private readonly BackgroundWorker _bw = new BackgroundWorker();
         private CancellationTokenSource tokenSource;
 
-        public string SQLServerAddress = @"192.168.252.99";
-        public string PostgresServerAddress = @"192.168.252.100";
+        public string SQLServerAddress = "192.168.0.1";
+        public string PostgresServerAddress = "";
 
-        public string SqlDbName = "GPS";
-        public string PostgreDbName = "gps";
+        public string SqlDbName = "dbName";
+        public string PostgreDbName = "dbname";
 
         public string SqlUser = "sa";
-        public string PostgreUser = @"postgres";
+        public string PostgreUser = "postgres";
 
-        public string SqlPass = "millenium_falcon_1";
-        public string PostgrePass = @"postgres";
+        public string SqlPass = "sa";
+        public string PostgrePass = "postgres";
 
         public string SqlProvider = @"System.Data.SqlClient";
         public string PostgreProvider = @"Npgsql";

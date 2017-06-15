@@ -70,7 +70,7 @@
             this.txtSqlAddress.Name = "txtSqlAddress";
             this.txtSqlAddress.Size = new System.Drawing.Size(177, 20);
             this.txtSqlAddress.TabIndex = 0;
-            this.txtSqlAddress.Text = "192.168.252.99";
+            this.txtSqlAddress.Text = "192.168.0.1";
             // 
             // btnCheckSqlConnection
             // 
@@ -136,7 +136,7 @@
             this.txtSqlCatalog.Name = "txtSqlCatalog";
             this.txtSqlCatalog.Size = new System.Drawing.Size(177, 20);
             this.txtSqlCatalog.TabIndex = 5;
-            this.txtSqlCatalog.Text = "GPSPROTECTMAIN";
+            this.txtSqlCatalog.Text = "dbName";
             // 
             // lblSqlPass
             // 
@@ -154,7 +154,7 @@
             this.txtSqlPass.PasswordChar = '*';
             this.txtSqlPass.Size = new System.Drawing.Size(177, 20);
             this.txtSqlPass.TabIndex = 9;
-            this.txtSqlPass.Text = "millenium_falcon_1";
+            this.txtSqlPass.Text = "sa";
             // 
             // lblSqlUser
             // 
@@ -301,7 +301,7 @@
             this.txtPostgreCatalog.Name = "txtPostgreCatalog";
             this.txtPostgreCatalog.Size = new System.Drawing.Size(177, 20);
             this.txtPostgreCatalog.TabIndex = 20;
-            this.txtPostgreCatalog.Text = "gpsprotectmain";
+            this.txtPostgreCatalog.Text = "dbname";
             // 
             // lblPostgreAddress
             // 
