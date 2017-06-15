@@ -58,6 +58,10 @@
             this.txtPostgreAddress = new System.Windows.Forms.TextBox();
             this.progressBar = new System.Windows.Forms.ProgressBar();
             this.btnCheckPostgreConnection = new System.Windows.Forms.Button();
+            this.btnCancelConvertion = new System.Windows.Forms.Button();
+            this.txtFetchRows = new System.Windows.Forms.TextBox();
+            this.lblFetchRows = new System.Windows.Forms.Label();
+            this.chkAutoScrollStatus = new System.Windows.Forms.CheckBox();
             this.SuspendLayout();
             // 
             // txtSqlAddress
@@ -89,12 +93,14 @@
             // 
             // btnConvert
             // 
+            this.btnConvert.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this.btnConvert.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
             this.btnConvert.BackColor = System.Drawing.Color.Transparent;
             this.btnConvert.BackgroundImage = global::SqlToPostgre.Properties.Resources.Convert;
             this.btnConvert.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Center;
-            this.btnConvert.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
-            this.btnConvert.Location = new System.Drawing.Point(283, 142);
+            this.btnConvert.Font = new System.Drawing.Font("Segoe UI Semibold", 18.25F, System.Drawing.FontStyle.Bold);
+            this.btnConvert.ForeColor = System.Drawing.Color.Black;
+            this.btnConvert.Location = new System.Drawing.Point(674, 12);
             this.btnConvert.Name = "btnConvert";
             this.btnConvert.Size = new System.Drawing.Size(306, 118);
             this.btnConvert.TabIndex = 3;
@@ -105,12 +111,14 @@
             // 
             // txtStatus
             // 
-            this.txtStatus.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.txtStatus.Location = new System.Drawing.Point(0, 292);
+            this.txtStatus.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.txtStatus.Location = new System.Drawing.Point(0, 245);
             this.txtStatus.Multiline = true;
             this.txtStatus.Name = "txtStatus";
             this.txtStatus.ScrollBars = System.Windows.Forms.ScrollBars.Both;
-            this.txtStatus.Size = new System.Drawing.Size(884, 169);
+            this.txtStatus.Size = new System.Drawing.Size(994, 216);
             this.txtStatus.TabIndex = 4;
             // 
             // lblSqlCatalog
@@ -128,7 +136,7 @@
             this.txtSqlCatalog.Name = "txtSqlCatalog";
             this.txtSqlCatalog.Size = new System.Drawing.Size(177, 20);
             this.txtSqlCatalog.TabIndex = 5;
-            this.txtSqlCatalog.Text = "ExportToPostgre";
+            this.txtSqlCatalog.Text = "GPSPROTECTMAIN";
             // 
             // lblSqlPass
             // 
@@ -184,8 +192,7 @@
             // 
             // btnClearStatus
             // 
-            this.btnClearStatus.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnClearStatus.Location = new System.Drawing.Point(774, 262);
+            this.btnClearStatus.Location = new System.Drawing.Point(0, 214);
             this.btnClearStatus.Name = "btnClearStatus";
             this.btnClearStatus.Size = new System.Drawing.Size(110, 32);
             this.btnClearStatus.TabIndex = 13;
@@ -213,7 +220,7 @@
             // lblPostgrePort
             // 
             this.lblPostgrePort.AutoSize = true;
-            this.lblPostgrePort.Location = new System.Drawing.Point(604, 145);
+            this.lblPostgrePort.Location = new System.Drawing.Point(337, 145);
             this.lblPostgrePort.Name = "lblPostgrePort";
             this.lblPostgrePort.Size = new System.Drawing.Size(65, 13);
             this.lblPostgrePort.TabIndex = 29;
@@ -221,16 +228,16 @@
             // 
             // txtPostgrePort
             // 
-            this.txtPostgrePort.Location = new System.Drawing.Point(694, 142);
+            this.txtPostgrePort.Location = new System.Drawing.Point(427, 142);
             this.txtPostgrePort.Name = "txtPostgrePort";
             this.txtPostgrePort.Size = new System.Drawing.Size(177, 20);
             this.txtPostgrePort.TabIndex = 28;
-            this.txtPostgrePort.Text = "5433";
+            this.txtPostgrePort.Text = "5432";
             // 
             // lblPostgreProvider
             // 
             this.lblPostgreProvider.AutoSize = true;
-            this.lblPostgreProvider.Location = new System.Drawing.Point(604, 119);
+            this.lblPostgreProvider.Location = new System.Drawing.Point(337, 119);
             this.lblPostgreProvider.Name = "lblPostgreProvider";
             this.lblPostgreProvider.Size = new System.Drawing.Size(85, 13);
             this.lblPostgreProvider.TabIndex = 27;
@@ -238,7 +245,7 @@
             // 
             // txtPostgreProvider
             // 
-            this.txtPostgreProvider.Location = new System.Drawing.Point(694, 116);
+            this.txtPostgreProvider.Location = new System.Drawing.Point(427, 116);
             this.txtPostgreProvider.Name = "txtPostgreProvider";
             this.txtPostgreProvider.Size = new System.Drawing.Size(177, 20);
             this.txtPostgreProvider.TabIndex = 26;
@@ -247,7 +254,7 @@
             // lblPostgrePass
             // 
             this.lblPostgrePass.AutoSize = true;
-            this.lblPostgrePass.Location = new System.Drawing.Point(604, 93);
+            this.lblPostgrePass.Location = new System.Drawing.Point(337, 93);
             this.lblPostgrePass.Name = "lblPostgrePass";
             this.lblPostgrePass.Size = new System.Drawing.Size(69, 13);
             this.lblPostgrePass.TabIndex = 25;
@@ -255,7 +262,7 @@
             // 
             // txtPostgrePass
             // 
-            this.txtPostgrePass.Location = new System.Drawing.Point(694, 90);
+            this.txtPostgrePass.Location = new System.Drawing.Point(427, 90);
             this.txtPostgrePass.Name = "txtPostgrePass";
             this.txtPostgrePass.PasswordChar = '*';
             this.txtPostgrePass.Size = new System.Drawing.Size(177, 20);
@@ -265,7 +272,7 @@
             // lblPostgreUser
             // 
             this.lblPostgreUser.AutoSize = true;
-            this.lblPostgreUser.Location = new System.Drawing.Point(604, 67);
+            this.lblPostgreUser.Location = new System.Drawing.Point(337, 67);
             this.lblPostgreUser.Name = "lblPostgreUser";
             this.lblPostgreUser.Size = new System.Drawing.Size(68, 13);
             this.lblPostgreUser.TabIndex = 23;
@@ -273,7 +280,7 @@
             // 
             // txtPostgreUser
             // 
-            this.txtPostgreUser.Location = new System.Drawing.Point(694, 64);
+            this.txtPostgreUser.Location = new System.Drawing.Point(427, 64);
             this.txtPostgreUser.Name = "txtPostgreUser";
             this.txtPostgreUser.Size = new System.Drawing.Size(177, 20);
             this.txtPostgreUser.TabIndex = 22;
@@ -282,7 +289,7 @@
             // lblPostgreCatalog
             // 
             this.lblPostgreCatalog.AutoSize = true;
-            this.lblPostgreCatalog.Location = new System.Drawing.Point(604, 41);
+            this.lblPostgreCatalog.Location = new System.Drawing.Point(337, 41);
             this.lblPostgreCatalog.Name = "lblPostgreCatalog";
             this.lblPostgreCatalog.Size = new System.Drawing.Size(82, 13);
             this.lblPostgreCatalog.TabIndex = 21;
@@ -290,16 +297,16 @@
             // 
             // txtPostgreCatalog
             // 
-            this.txtPostgreCatalog.Location = new System.Drawing.Point(694, 38);
+            this.txtPostgreCatalog.Location = new System.Drawing.Point(427, 38);
             this.txtPostgreCatalog.Name = "txtPostgreCatalog";
             this.txtPostgreCatalog.Size = new System.Drawing.Size(177, 20);
             this.txtPostgreCatalog.TabIndex = 20;
-            this.txtPostgreCatalog.Text = "test20170526";
+            this.txtPostgreCatalog.Text = "gpsprotectmain";
             // 
             // lblPostgreAddress
             // 
             this.lblPostgreAddress.AutoSize = true;
-            this.lblPostgreAddress.Location = new System.Drawing.Point(604, 15);
+            this.lblPostgreAddress.Location = new System.Drawing.Point(337, 15);
             this.lblPostgreAddress.Name = "lblPostgreAddress";
             this.lblPostgreAddress.Size = new System.Drawing.Size(84, 13);
             this.lblPostgreAddress.TabIndex = 19;
@@ -307,7 +314,7 @@
             // 
             // txtPostgreAddress
             // 
-            this.txtPostgreAddress.Location = new System.Drawing.Point(694, 12);
+            this.txtPostgreAddress.Location = new System.Drawing.Point(427, 12);
             this.txtPostgreAddress.Name = "txtPostgreAddress";
             this.txtPostgreAddress.Size = new System.Drawing.Size(177, 20);
             this.txtPostgreAddress.TabIndex = 17;
@@ -315,7 +322,8 @@
             // 
             // progressBar
             // 
-            this.progressBar.Location = new System.Drawing.Point(284, 254);
+            this.progressBar.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.progressBar.Location = new System.Drawing.Point(675, 124);
             this.progressBar.Name = "progressBar";
             this.progressBar.Size = new System.Drawing.Size(304, 10);
             this.progressBar.Style = System.Windows.Forms.ProgressBarStyle.Marquee;
@@ -324,7 +332,7 @@
             // 
             // btnCheckPostgreConnection
             // 
-            this.btnCheckPostgreConnection.Location = new System.Drawing.Point(619, 168);
+            this.btnCheckPostgreConnection.Location = new System.Drawing.Point(352, 168);
             this.btnCheckPostgreConnection.Name = "btnCheckPostgreConnection";
             this.btnCheckPostgreConnection.Size = new System.Drawing.Size(252, 23);
             this.btnCheckPostgreConnection.TabIndex = 31;
@@ -332,12 +340,57 @@
             this.btnCheckPostgreConnection.UseVisualStyleBackColor = true;
             this.btnCheckPostgreConnection.Click += new System.EventHandler(this.btnCheckPostgreConnection_Click);
             // 
+            // btnCancelConvertion
+            // 
+            this.btnCancelConvertion.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnCancelConvertion.Location = new System.Drawing.Point(674, 140);
+            this.btnCancelConvertion.Name = "btnCancelConvertion";
+            this.btnCancelConvertion.Size = new System.Drawing.Size(306, 23);
+            this.btnCancelConvertion.TabIndex = 34;
+            this.btnCancelConvertion.Text = "Cancel convertion";
+            this.btnCancelConvertion.UseVisualStyleBackColor = true;
+            this.btnCancelConvertion.Visible = false;
+            this.btnCancelConvertion.Click += new System.EventHandler(this.btnCancelConvertion_Click);
+            // 
+            // txtFetchRows
+            // 
+            this.txtFetchRows.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.txtFetchRows.Location = new System.Drawing.Point(801, 180);
+            this.txtFetchRows.Name = "txtFetchRows";
+            this.txtFetchRows.Size = new System.Drawing.Size(178, 20);
+            this.txtFetchRows.TabIndex = 32;
+            this.txtFetchRows.Text = "100000";
+            // 
+            // lblFetchRows
+            // 
+            this.lblFetchRows.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.lblFetchRows.AutoSize = true;
+            this.lblFetchRows.Location = new System.Drawing.Point(672, 174);
+            this.lblFetchRows.Name = "lblFetchRows";
+            this.lblFetchRows.Size = new System.Drawing.Size(123, 26);
+            this.lblFetchRows.TabIndex = 33;
+            this.lblFetchRows.Text = "Number of rows to fetch \r\nfrom SQL table per cycle";
+            // 
+            // chkAutoScrollStatus
+            // 
+            this.chkAutoScrollStatus.AutoSize = true;
+            this.chkAutoScrollStatus.Location = new System.Drawing.Point(116, 222);
+            this.chkAutoScrollStatus.Name = "chkAutoScrollStatus";
+            this.chkAutoScrollStatus.Size = new System.Drawing.Size(106, 17);
+            this.chkAutoScrollStatus.TabIndex = 35;
+            this.chkAutoScrollStatus.Text = "Auto-scroll status";
+            this.chkAutoScrollStatus.UseVisualStyleBackColor = true;
+            // 
             // Main
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Center;
-            this.ClientSize = new System.Drawing.Size(884, 461);
+            this.ClientSize = new System.Drawing.Size(994, 461);
+            this.Controls.Add(this.chkAutoScrollStatus);
+            this.Controls.Add(this.btnCancelConvertion);
+            this.Controls.Add(this.lblFetchRows);
+            this.Controls.Add(this.txtFetchRows);
             this.Controls.Add(this.btnCheckPostgreConnection);
             this.Controls.Add(this.progressBar);
             this.Controls.Add(this.lblPostgrePort);
@@ -369,8 +422,7 @@
             this.Controls.Add(this.btnCheckSqlConnection);
             this.Controls.Add(this.txtSqlAddress);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
-            this.MaximizeBox = false;
-            this.MinimumSize = new System.Drawing.Size(800, 500);
+            this.MinimumSize = new System.Drawing.Size(1010, 500);
             this.Name = "Main";
             this.Text = "Main";
             this.ResumeLayout(false);
@@ -410,6 +462,10 @@
         private System.Windows.Forms.TextBox txtPostgreAddress;
         private System.Windows.Forms.ProgressBar progressBar;
         private System.Windows.Forms.Button btnCheckPostgreConnection;
+        private System.Windows.Forms.Button btnCancelConvertion;
+        private System.Windows.Forms.TextBox txtFetchRows;
+        private System.Windows.Forms.Label lblFetchRows;
+        private System.Windows.Forms.CheckBox chkAutoScrollStatus;
     }
 }
 

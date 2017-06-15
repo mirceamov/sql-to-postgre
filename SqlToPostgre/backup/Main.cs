@@ -2,8 +2,6 @@
 using Npgsql;
 using NpgsqlTypes;
 using System;
-using System.Collections;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -13,7 +11,6 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Z.BulkOperations;
@@ -23,25 +20,67 @@ namespace SqlToPostgre
     public partial class Main : Form
     {
         private readonly BackgroundWorker _bw = new BackgroundWorker();
-        private CancellationTokenSource tokenSource;
+        /// <summary>
+        /// Item1 = table name, Item2 = postgresql column name, Item3 = sql server column name
+        /// </summary>
+        public List<Tuple<string, string, string>> tablePKs = new List<Tuple<string, string, string>>(); 
+        public int fetchRows = 100000;
+        public string[] indexes;
+        // Array for DEFAULT values.
+        public string[] defaults;
 
+        /// <summary>
+        /// SQL Server Express used on first try.
+        /// </summary>
         public string SQLServerAddress = @"192.168.252.99";
+
+        /// <summary>
+        /// PostgreSQL Server.
+        /// </summary>
         public string PostgresServerAddress = @"192.168.252.100";
 
-        public string SqlDbName = "GPS";
-        public string PostgreDbName = "gps";
+        /// <summary>
+        /// SQL Server db name.
+        /// </summary>
+        public string SqlDbName = "ExportToPostgre";
 
+        /// <summary>
+        /// PostgreSQL db name (in lower case).
+        /// </summary>
+        public string PostgreDbName = "test20170530";
+
+        /// <summary>
+        /// SQL Server user name (empty for Windows Authentication).
+        /// </summary>
         public string SqlUser = "sa";
+
+        /// <summary>
+        /// PostgreSQL user name.
+        /// </summary>
         public string PostgreUser = @"postgres";
 
         public string SqlPass = "millenium_falcon_1";
+
         public string PostgrePass = @"postgres";
 
         public string SqlProvider = @"System.Data.SqlClient";
+
         public string PostgreProvider = @"Npgsql";
 
+        /// <summary>
+        /// The SQL Server database port.
+        /// </summary>
         public int SqlPort = 1433;
-        public int PostgrePort = 5432;      
+
+        /// <summary>
+        /// The PostgreSQL database port.
+        /// </summary>
+        public int PostgrePort = 5432;
+
+        /// <summary>
+        /// Gets or sets the last errror.
+        /// </summary>
+        public string LastErrror { get; set; }
         
 
         public Main()
@@ -88,7 +127,7 @@ namespace SqlToPostgre
 
         private void btnConvert_Click(object sender, EventArgs e)
         {
-            tokenSource = new CancellationTokenSource();
+            tablePKs = null;
             btnConvert.Enabled = false;
             btnCancelConvertion.Visible = true;
             progressBar.Show();
@@ -122,13 +161,13 @@ namespace SqlToPostgre
                 {
                     // Copy to PostgreSQL database.
                     StatusWriteLine("-----------------------------");
-                    result = CopyToPostgreSql(connectionStringSqlServer, connectionStringPostgresql);
+                    result = CopyToPostgreSql(connectionStringSqlServer, connectionStringPostgresql, ref doWorkEventArgs);
                     StatusWriteLine("-----------------------------");
 
                     if (result != "Aborted")
                     {
-                        //CreateViews(connectionStringSqlServer, connectionStringPostgresql);
-                        //StatusWriteLine("-----------------------------");
+                        CreateViews(connectionStringSqlServer, connectionStringPostgresql);
+                        StatusWriteLine("-----------------------------");
                         CreateForeignKeys(connectionStringSqlServer, connectionStringPostgresql);
                         StatusWriteLine("-----------------------------");
                     }
@@ -142,7 +181,6 @@ namespace SqlToPostgre
         private void btnCancelConvertion_Click(object sender, EventArgs e)
         {
             _bw.CancelAsync();
-            tokenSource.Cancel();
         }
 
         private void BwRunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
@@ -290,272 +328,274 @@ namespace SqlToPostgre
         }
 
 
-
-        string CopyTable(string connectionStringSqlServer, string connectionStringPostgresql, DataRow tableInfo)
+        /// <summary>
+        /// Copy data from MSSQL directly to PostgreSQL.
+        /// If the target database does not exist, create it.
+        /// </summary>
+        public string CopyToPostgreSql(string connectionStringSqlServer, string connectionStringPostgresql, ref DoWorkEventArgs doWorkEventArgs)
         {
-            List<Tuple<string, string, string>> tablePKs = new List<Tuple<string, string, string>>();            
-            string[] indexes = new string[10];
-            string[] defaults = new string[10];
-
-            int fetchRows = 100000;
-            fetchRows = int.TryParse(txtFetchRows.Text, out fetchRows) ? fetchRows : 100000;
-
             var msTables = new List<string>();
             var msColumns = new List<string>();
             var msColumnsB = new List<string>();
-
-            string msSchema = (string)tableInfo[1];
-            string msTablename = (string)tableInfo[2];
-            string pgTablename = msTablename.Replace(' ', '_').ToLower();
-
-            if (pgTablename == "sysdiagrams")
-            {
-                return "sysdiagrams table not to be copied";
-            }
+            var pgColumns = new List<string>();
+            int pgTableCount = 0;
 
             using (var pgConnection = new NpgsqlConnection(connectionStringPostgresql))
             {
                 pgConnection.Open();
 
+                // Process all SQL Server tables.
                 using (var msConnection = new SqlConnection(connectionStringSqlServer))
                 {
                     msConnection.Open();
 
                     if (msConnection.State == ConnectionState.Open)
                     {
-                        string pgCreateFields = GetFieldInformation(msConnection, msTablename, ref msColumns, ref msSchema, ref indexes, ref defaults, ref tablePKs);
+                        //// Get the Meta Data for Supported Schema Collections
+                        //DataTable metaDataTable = msConnection.GetSchema("MetaDataCollections");
 
-                        var pgSchema = msSchema.Replace(' ', '_');
-                        pgTablename = pgSchema + "." + pgTablename;
-                        bool result1 = ExecuteSqlScript(connectionStringPostgresql, "create schema if not exists " + pgSchema + ";");
+                        //// Get the schema information of Databases in your instance
+                        //DataTable databasesSchemaTable = msConnection.GetSchema("Databases");
 
-                        var pgSql1 = string.Format("create table {0} ({1});", pgTablename, pgCreateFields);
-                        StatusWriteLine(string.Format("CREATE POSTGRE TABLE : {0}", pgSql1));
-                        bool result2 = ExecuteSqlScript(connectionStringPostgresql, pgSql1);
+                        //// Get schema information of all the tables in current database;
+                        //DataTable allTablesSchemaTable = msConnection.GetSchema("Tables");
 
-                        //COPY DATA FROM SQL TO POSTGRE
-                        for (int i = 0; i < msColumns.Count; i++)
+                        // Get only tables, not views.
+                        // https://msdn.microsoft.com/en-us/library/ms254969(v=vs.110).aspx
+                        DataTable dt = msConnection.GetSchema("Tables", new string[] { null, null, null, "BASE TABLE" });
+
+                        foreach (DataRow rowTable in dt.Rows)
                         {
-                            msColumnsB.Add("[" + msColumns[i] + "]");
-                        }
+                            string msSchema = (string)rowTable[1];
+                            string msTablename = (string)rowTable[2];
+                            string pgTablename = msTablename.Replace(' ', '_');
 
-                        string msColumnsJoin = string.Join(",", msColumnsB);
-
-                        // Read values from source db.
-                        var command = msConnection.CreateCommand();
-                        command.CommandTimeout = 0;
-
-                        var noMoreSqlData = false;
-                        var offsetRows = 0; //skip rows
-                        long minID = 0;
-                        long maxID = 0;
-
-                        if (tablePKs != null && tablePKs.Count > 0 && (msTablename == "Positions" || msTablename == "PositionExtendedData"))
-                        {
-                            var commandMinMax = msConnection.CreateCommand();
-                            commandMinMax.CommandTimeout = 0;
-                            commandMinMax.CommandText = string.Format("SELECT min({0}) AS minPK, max({0}) AS maxPK FROM [{1}].[{2}].[{3}]", tablePKs[0].Item3, SqlDbName, msSchema, msTablename);
-                            object[] minMaxObjects = new object[2];
-                            using (var dr = commandMinMax.ExecuteReader(CommandBehavior.Default))
+                            //confirm table copy
+                            if (chkConfirmTableCopy.Checked)
                             {
-                                while (dr.Read())
+                                if (MessageBox.Show(string.Format("Vrei sa copiezi tabela {0}", msTablename), "Confirmare copiere", MessageBoxButtons.YesNo) == DialogResult.No)
                                 {
-                                    dr.GetValues(minMaxObjects);
+                                    continue;
                                 }
                             }
 
-                            minID = long.TryParse(minMaxObjects[0].ToString(), out minID) ? minID : 0;
-                            maxID = long.TryParse(minMaxObjects[1].ToString(), out maxID) ? maxID : 0;
-                            StatusWriteLine(string.Format("minID: {0} / maxID: {1}", minID, maxID));
-                        }
+                            if (pgTablename == "sysdiagrams")
+                            {
+                                continue;
+                            }
+                            
+                            StatusWriteLine(msTablename);
+                            msTables.Add(msTablename);
+                            msColumns.Clear();
+                            msColumnsB.Clear();
+                            pgColumns.Clear();
 
-                        while (!noMoreSqlData)
-                        {
-                            string msSql = "";
+                            ////Database.ExecuteSqlScript(this.ConnectionStringPostgresql, "ALTER TABLE " + pgTablename + " DISABLE TRIGGER ALL;");
+                            ////Database.ExecuteSqlScript(this.ConnectionStringPostgresql, "DELETE FROM " + pgTablename + ";");
 
-                            //min and max ids are used only for Positions and PositionExtendedData tables
+                            // Get the columns, convert data types to PostgreSQL, also fill this.indexes array.
+                            string pgCreateFields = GetFieldInformation(msConnection, msTablename, ref msColumns, ref msSchema);
+
+                            // Add schema to tablename.
+                            var pgSchema = msSchema.Replace(' ', '_');
+                            pgTablename = pgSchema + "." + pgTablename;
+                            bool result1 = ExecuteSqlScript(connectionStringPostgresql, "create schema if not exists " + pgSchema + ";");
+
+                            // Create PostgreSQL table with column names and field definitions, example:
+                            // CREATE TABLE test (
+                            //    id            uuid NOT NULL,
+                            //    number        int NULL,
+                            //    constraint    pk_name primary key(id,number) )
+                            var pgSql1 = string.Format("create table {0} ({1});", pgTablename, pgCreateFields);
+                            StatusWriteLine(pgSql1);
+                            bool result2 = ExecuteSqlScript(connectionStringPostgresql, pgSql1);
+
+                            
+                            ////BEGIN TO COPY DATA FROM SQL TO POSTGRE
+
+                            // Replace spaces with underscores for PostgreSQL.
+                            // Surround fields with brackets for SQL Server.
+                            for (int i = 0; i < msColumns.Count; i++)
+                            {
+                                //pgColumns.Add("\"" + msColumns[i].ToLower() + "\"");
+                                pgColumns.Add(msColumns[i].ToLower().Replace(' ', '_'));
+                                msColumnsB.Add("[" + msColumns[i] + "]");
+                            }
+
+                            string msColumnsJoin = string.Join(",", msColumnsB);
+                            string pgColumnsJoin = string.Join(",", pgColumns);
+                            string pgParameters = "@" + string.Join(",@", pgColumns);
+                            
+                            // Read values from source db.
+                            var command = msConnection.CreateCommand();
+                            command.CommandTimeout = 0;
+
+                            var noMoreSqlData = false;
+                            var offsetRows = 0; //skip rows
+                            long minID = 0;
+                            long maxID = 0;
+
                             if (tablePKs != null && tablePKs.Count > 0 && (msTablename == "Positions" || msTablename == "PositionExtendedData"))
                             {
-                                var nextID = minID + fetchRows;
-                                msSql = string.Format(@"SELECT {0} FROM [{1}].[{2}].[{3}] WHERE {4} >= {5} AND {4} < {6}", msColumnsJoin, SqlDbName, msSchema, msTablename, tablePKs[0].Item3, minID, nextID);
-                                minID = nextID;
-                            }
-                            else if (tablePKs != null && tablePKs.Count > 0)
-                            {
-                                msSql = string.Format(@"SELECT {0} FROM [{1}].[{2}].[{3}] ORDER BY {4} OFFSET {5} ROWS FETCH NEXT {6} ROWS ONLY", msColumnsJoin, SqlDbName, msSchema, msTablename, tablePKs[0].Item3, offsetRows, fetchRows);
-                            }
-                            else
-                            {
-                                msSql = string.Format(@"SELECT {0} FROM [{1}].[{2}].[{3}]", msColumnsJoin, SqlDbName, msSchema, msTablename);
-                                noMoreSqlData = true;
-                            }
-
-                            command.CommandText = msSql;
-                            StatusWriteLine(string.Format("COPY DATA FROM SQL : {0}", msSql));
-
-                            // Insert values into target db.
-                            DataTable dataTable = new DataTable();
-
-                            //5 retries
-                            for (int i = 0; i < 5; i++)
-                            {
-                                try
+                                var commandMinMax = msConnection.CreateCommand();
+                                commandMinMax.CommandTimeout = 0;
+                                commandMinMax.CommandText = string.Format("SELECT min({0}) AS minPK, max({0}) AS maxPK FROM [{1}].[{2}].[{3}]", tablePKs[0].Item3, SqlDbName, msSchema, msTablename);
+                                object[] minMaxObjects = new object[2];
+                                using (var dr = commandMinMax.ExecuteReader(CommandBehavior.Default))
                                 {
-                                    using (var dr = command.ExecuteReader(CommandBehavior.Default))
+                                    while (dr.Read())
                                     {
-                                        dataTable.Clear();
-                                        dataTable.Load(dr);
+                                        dr.GetValues(minMaxObjects);
+                                    }
+                                }
+                                
+                                minID = long.TryParse(minMaxObjects[0].ToString(), out minID) ? minID : 0;
+                                maxID = long.TryParse(minMaxObjects[1].ToString(), out maxID) ? maxID : 0;
+                                StatusWriteLine(string.Format("minID: {0} / maxID: {1}", minID, maxID));
+                            }
 
-                                        ReplaceNullCharacter(msTablename, ref dataTable);
+                            while (!noMoreSqlData)
+                            {
+                                string msSql = "";
 
-                                        if (minID > maxID && (msTablename == "Positions" || msTablename == "PositionExtendedData"))
+                                //min and max ids are used only for Positions and PositionExtendedData tables
+                                if (tablePKs != null && tablePKs.Count > 0 && (msTablename == "Positions" || msTablename == "PositionExtendedData"))
+                                {
+                                    var nextID = minID + 100000;
+                                    msSql = string.Format(@"SELECT {0} FROM [{1}].[{2}].[{3}] WHERE {4} >= {5} AND {4} < {6}", msColumnsJoin, SqlDbName, msSchema, msTablename, tablePKs[0].Item3, minID, nextID);
+                                    minID = nextID;
+                                }
+                                else if (tablePKs != null && tablePKs.Count > 0)
+                                {
+                                    msSql = string.Format(@"SELECT {0} FROM [{1}].[{2}].[{3}] ORDER BY {4} OFFSET {5} ROWS FETCH NEXT {6} ROWS ONLY", msColumnsJoin, SqlDbName, msSchema, msTablename, tablePKs[0].Item3, offsetRows, fetchRows);
+                                }
+                                else
+                                {
+                                    msSql = string.Format(@"SELECT {0} FROM [{1}].[{2}].[{3}]", msColumnsJoin, SqlDbName, msSchema, msTablename);
+                                    noMoreSqlData = true;
+                                }
+
+                                command.CommandText = msSql;                                
+                                StatusWriteLine(msSql);
+
+                                // Insert values into target db.
+                                DataTable dataTable = new DataTable();
+
+                                //5 retries
+                                for (int i = 0; i < 5; i++)
+                                {
+                                    try
+                                    {
+                                        using (var dr = command.ExecuteReader(CommandBehavior.Default))
                                         {
-                                            noMoreSqlData = true;
-                                        }
-                                        else
-                                        {
-                                            if (dataTable.Rows.Count < fetchRows && msTablename != "Positions" && msTablename != "PositionExtendedData")
+                                            dataTable.Clear();
+                                            dataTable.Load(dr);
+                                            
+                                            ReplaceNullCharacter(msTablename, ref dataTable);
+
+                                            if (minID > maxID && (msTablename == "Positions" || msTablename == "PositionExtendedData"))
                                             {
                                                 noMoreSqlData = true;
                                             }
                                             else
                                             {
-                                                offsetRows += fetchRows;
+                                                if (dataTable.Rows.Count < fetchRows && msTablename != "Positions" && msTablename != "PositionExtendedData")
+                                                {
+                                                    noMoreSqlData = true;
+                                                }
+                                                else
+                                                {
+                                                    offsetRows += fetchRows;
+                                                }
                                             }
                                         }
+                                        break;
                                     }
-                                    break;
-                                }
-                                catch (SqlException e)
-                                {                                    
-                                    StatusWriteLine(string.Format("EROARE : {0}", e.Message));
-                                    Thread.Sleep(1000);
-                                    if (msConnection != null && msConnection.State != ConnectionState.Open)
+                                    catch (SqlException e)
                                     {
-                                        msConnection.Open();
+                                        StatusWriteLine(string.Format("EROARE : {0}", e.Message));
+
+                                        if (msConnection != null && msConnection.State != ConnectionState.Open)
+                                        {
+                                            msConnection.Open();
+                                        }
+                                        StatusWriteLine(string.Format("Retry {0}", i));
+
+                                        continue;                                        
                                     }
-                                    StatusWriteLine(string.Format("Retry {0}", i));
-
-                                    continue;
                                 }
-                            }
+                                
+                                var bulk = new BulkOperation(pgConnection);
+                                bulk.BatchSize = dataTable.Rows.Count;
+                                bulk.DestinationTableName = pgTablename.ToLower();
+                                bulk.CaseSensitive = CaseSensitiveType.Insensitive;
+                                bulk.AllowUpdatePrimaryKeys = true;
 
-                            var bulk = new BulkOperation(pgConnection);
-                            bulk.BatchSize = dataTable.Rows.Count;
-                            bulk.DestinationTableName = pgTablename;
-                            bulk.CaseSensitive = CaseSensitiveType.Insensitive;
-                            bulk.AllowUpdatePrimaryKeys = true;
-
-                            try
-                            {
-                                bulk.BulkInsert(dataTable);
-                            }
-                            catch (Exception ex)
-                            {
-                                StatusWriteLine(string.Format("ERROR ON BULK INSERT IN TABLE '{0}' : {1}", pgTablename, ex.Message));
-                            }
-
-                            if (_bw.CancellationPending)
-                            {
-                                return "Aborted";
-                            }
-                        }
-
-                        StatusWriteLine(string.Format("Data for table '{0}' was copied.", pgTablename.ToLower()));
-
-                        // Create DEFAULT values.
-                        if (defaults != null)
-                        {
-                            foreach (string pgDefault in defaults)
-                            {
-                                ExecuteSqlScript(connectionStringPostgresql, pgDefault);
-                                StatusWriteLine(string.Format("Default : {0}", pgDefault));
-                            }
-                        }
-
-                        // Index is created after the bulk insert operation.
-                        if (indexes != null)
-                        {
-                            foreach (string pgIndex in indexes)
-                            {
-                                if (!pgIndex.StartsWith("constraint"))
+                                try
                                 {
-                                    ExecuteSqlScript(connectionStringPostgresql, pgIndex);
-                                    StatusWriteLine(string.Format("Index '{0}' for table '{1}' was created.", pgIndex, pgTablename.ToLower()));
+                                    bulk.BulkInsert(dataTable);
                                 }
-                            }
-                        }
-
-                        //Set primary key to autoincrement from max value
-                        if (tablePKs.Count > 0)
-                        {
-                            foreach (var tableColIndex in tablePKs)
-                            {
-                                if (tableColIndex.Item2.Split(',').Count() == 1)
+                                catch(Exception ex)
                                 {
-                                    var serialSeq = string.Format("SELECT setval(pg_get_serial_sequence('{0}', '{1}'), coalesce(max({1}), 0) + 1, false) FROM {0};", tableColIndex.Item1, tableColIndex.Item2);
-                                    ExecuteSqlScript(connectionStringPostgresql, serialSeq);
-                                    StatusWriteLine(string.Format("Serial sequence set to max primary key '{0}' for table '{1}' was created.", tableColIndex.Item2, tableColIndex.Item1));
+                                    LastErrror = ex.Message;
+                                    StatusWriteLine(LastErrror);
+                                }
+
+                                if (_bw.CancellationPending)
+                                {
+                                    doWorkEventArgs.Cancel = true;
+                                    return "Aborted";
                                 }
                             }
-                        }
-                    }
-                }
-            }
-            return string.Format("TABLE '{0}' WAS MOVED TO POSTGRESQL", pgTablename.ToLower());
-        }
 
+                            pgTableCount++;
+                            //// ExecuteSqlScript(this.ConnectionStringPostgresql, "ALTER TABLE " + pgTablename + " ENABLE TRIGGER ALL;");
+                            StatusWriteLine(string.Format("Data for table '{0}' was copied.", pgTablename.ToLower()));
 
-        /// <summary>
-        /// Copy data from MSSQL directly to PostgreSQL.
-        /// If the target database does not exist, create it.
-        /// </summary>
-        public string CopyToPostgreSql(string connectionStringSqlServer, string connectionStringPostgresql)
-        {            
-            var token = tokenSource.Token;
-            List<Task> tasks = new List<Task>();
-            var tableList = new ConcurrentBag<string>();
+                            // Create DEFAULT values.
+                            if (defaults != null)
+                            {
+                                foreach (string pgDefault in defaults)
+                                {
+                                    ExecuteSqlScript(connectionStringPostgresql, pgDefault);
+                                    StatusWriteLine(string.Format("Default : {0}", pgDefault));
+                                }
+                            }
 
-            using (var pgConnection = new NpgsqlConnection(connectionStringPostgresql))
-            {
-                pgConnection.Open();
-                
-                using (var msConnection = new SqlConnection(connectionStringSqlServer))
-                {
-                    msConnection.Open();
+                            // Index is created after the bulk insert operation.
+                            if (indexes != null)
+                            {
+                                foreach (string pgIndex in indexes)
+                                {
+                                    if (!pgIndex.StartsWith("constraint"))
+                                    {
+                                        ExecuteSqlScript(connectionStringPostgresql, pgIndex);
+                                        StatusWriteLine(string.Format("Index '{0}' for table '{1}' was created.", pgIndex, pgTablename.ToLower()));
+                                    }
+                                }
+                            }
 
-                    if (msConnection.State == ConnectionState.Open)
-                    {
-                        DataTable dt = msConnection.GetSchema("Tables", new string[] { null, null, null, "BASE TABLE" });
+                            //Set primary key to autoincrement from max value
+                            if(tablePKs.Count > 0)
+                            {
+                                foreach (var tableColIndex in tablePKs)
+                                {
+                                    if (tableColIndex.Item2.Split(',').Count() == 1)
+                                    {
+                                        var serialSeq = string.Format("SELECT setval(pg_get_serial_sequence('{0}', '{1}'), coalesce(max({1}), 0) + 1, false) FROM {0};", tableColIndex.Item1, tableColIndex.Item2);
+                                        ExecuteSqlScript(connectionStringPostgresql, serialSeq);
+                                        StatusWriteLine(string.Format("Serial sequence set to max primary key '{0}' for table '{1}' was created.", tableColIndex.Item2, tableColIndex.Item1));
+                                    }
+                                }
+                            }
 
-                        foreach (DataRow rowTable in dt.Rows)
-                        {
-                            Task t = Task.Run(() => {
-                                CopyTable(connectionStringSqlServer, connectionStringPostgresql, rowTable);
-                                tableList.Add((string)rowTable[2]);
-                            }, token);
-                            tasks.Add(t);                            
-                        }
-
-                        try
-                        {
-                            Task.WaitAll(tasks.ToArray());
-                        }
-                        catch (AggregateException e)
-                        {
-                            StatusWriteLine("Exception messages:");
-                            foreach (var ie in e.InnerExceptions)
-                                StatusWriteLine(string.Format("{0}: {1}", ie.GetType().Name, ie.Message));
-                        }
-                        finally
-                        {
-                            tokenSource.Dispose();
+                            StatusWriteLine(string.Empty);
                         }
                     }
                 }
             }
 
-            return "FINISHED";
+            return string.Format("Copied {0} tables of {1}", pgTableCount, msTables.Count);
         }
         
         /// <summary>
@@ -595,13 +635,14 @@ namespace SqlToPostgre
         /// "constraint pk_name primary key(field1,field2,field3 ...)".
         /// "create index index_name on tableName (field1,field2,field3 ...)"
         /// </summary>
-        public string[] GetIndexes(SqlConnection msConnection, string tableName, string schema, ref List<Tuple<string, string, string>> tablePKs)
+        public string[] GetIndexes(SqlConnection msConnection, string tableName, string schema)
         {
             string indexName = string.Empty;
             string indexColumns = string.Empty;
             string pgTableName = schema + "." + tableName;
             pgTableName = pgTableName.ToLower();
             var indexes = new List<string>();
+            tablePKs = new List<Tuple<string, string, string>>();
 
             try
             {
@@ -819,7 +860,7 @@ namespace SqlToPostgre
         /// https://msdn.microsoft.com/en-us/library/ms254969(v=vs.110).aspx
         /// http://www.postgresql.org/docs/9.3/static/datatype.html
         /// </summary>
-        public string GetFieldInformation(SqlConnection msConnection, string msTablename, ref List<string> msColumns, ref string schema, ref string[] indexes, ref string[] defaults, ref List<Tuple<string, string, string>> tablePKs)
+        public string GetFieldInformation(SqlConnection msConnection, string msTablename, ref List<string> msColumns, ref string schema)
         {
             // 0 = Catalog; 1 = Schema; 2 = Table Name; 3 = Column Name. 
             var columnRestrictions = new string[4];
@@ -890,8 +931,22 @@ namespace SqlToPostgre
 
             defaults = defaults1.ToArray();
 
-            indexes = GetIndexes(msConnection, msTablename, schema, ref tablePKs);
-            
+            ////create index after bulk insert
+            //// Add only primary key here, indexes are created later.
+            indexes = GetIndexes(msConnection, msTablename, schema);
+
+            //if (indexes != null)
+            //{
+            //    foreach (string index in indexes)
+            //    {
+            //        if (index.StartsWith("constraint"))
+            //        {
+            //            StatusWriteLine("Primary key = " + index);
+            //            pgFields.Add(index);
+            //        }
+            //    }
+            //}
+
             // Translate to PostgreSQL datatypes.
             pgCreateFields = string.Join(",", pgFields);
             pgCreateFields = pgCreateFields.ToLower();
@@ -899,11 +954,17 @@ namespace SqlToPostgre
             pgCreateFields = pgCreateFields.Replace(" nvarchar(max)", " text");
             pgCreateFields = pgCreateFields.Replace(" varchar(max)", " text");
             pgCreateFields = pgCreateFields.Replace(" nvarchar", " varchar");
+            //pgCreateFields = pgCreateFields.Replace("varchar", "varchar");
             pgCreateFields = pgCreateFields.Replace(" nchar", " char");
+            //pgCreateFields = pgCreateFields.Replace(" char", " char");
             pgCreateFields = pgCreateFields.Replace(" xml(max)", " text");
             pgCreateFields = pgCreateFields.Replace(" xml", " text");
+            //pgCreateFields = pgCreateFields.Replace("bigint", "bigint");
             pgCreateFields = pgCreateFields.Replace(" tinyint", " smallint");
+            //pgCreateFields = pgCreateFields.Replace(" float", " float");
+            //pgCreateFields = pgCreateFields.Replace(" real", " real");
             pgCreateFields = pgCreateFields.Replace(" double", " double precision");
+            //pgCreateFields = pgCreateFields.Replace("numeric", "numeric");
             pgCreateFields = pgCreateFields.Replace(" decimal", " numeric");
             pgCreateFields = pgCreateFields.Replace(" smallmoney", " numeric");
             pgCreateFields = pgCreateFields.Replace(" money", " numeric");
@@ -1099,6 +1160,7 @@ SELECT base_schema_name, base_table_name, constraint_name, base_column_name, uni
         public bool ExecuteSqlScript(string connectionString, string sqlClause)
         {
             bool result = false;
+            LastErrror = string.Empty;
 
             if (IsPostgresql(connectionString))
             {
@@ -1119,7 +1181,8 @@ SELECT base_schema_name, base_table_name, constraint_name, base_column_name, uni
                         }
                         catch (Exception ex)
                         {
-                            StatusWriteLine(string.Format("ExecuteSqlScript() error on query '{0}' : {1}", sqlClause, ex.Message));
+                            LastErrror = ex.Message;
+                            StatusWriteLine("ExecuteSqlScript() error: " + ex.Message);
                         }
                         finally
                         {
@@ -1146,7 +1209,8 @@ SELECT base_schema_name, base_table_name, constraint_name, base_column_name, uni
                         }
                         catch (Exception ex)
                         {
-                            StatusWriteLine(string.Format("ExecuteSqlScript() error on query '{0}' : {1}", sqlClause, ex.Message));
+                            LastErrror = ex.Message;
+                            StatusWriteLine("ExecuteSqlScript() error: " + ex.Message);
                         }
                         finally
                         {
@@ -1184,7 +1248,7 @@ SELECT base_schema_name, base_table_name, constraint_name, base_column_name, uni
                 connectionString = string.Format(@"Password={0};Persist Security Info=True;User ID={1};Data Source={2}", password, username, sqlServer);
             }
 
-            connectionString = @"Connection Timeout=30;" + connectionString;
+            connectionString = @"Connection Timeout=15;" + connectionString;
 
             if (!catalog.Equals(string.Empty))
             {
@@ -1228,7 +1292,7 @@ SELECT base_schema_name, base_table_name, constraint_name, base_column_name, uni
                     catalog = @"postgres";
                 }
 
-                // Set default CommandTimeout of infinite. 
+                // Set default CommandTimeout of 20 s. 
                 connectionString = string.Format(
                     "Server={0};Port={1};User Id={2};Password={3};MinPoolSize={4};MaxPoolSize={5};CommandTimeout={6};Database={7}",
                     server,
@@ -1237,7 +1301,7 @@ SELECT base_schema_name, base_table_name, constraint_name, base_column_name, uni
                     password,
                     Environment.ProcessorCount,
                     Environment.ProcessorCount * 10,
-                    0,
+                    20,
                     catalog);
             }
             else
@@ -1309,20 +1373,12 @@ SELECT base_schema_name, base_table_name, constraint_name, base_column_name, uni
                 this.Invoke(new Action<string, bool>(StatusWriteLine), new object[] { _text, newLine });
                 return;
             }
-
-            int caret = 0;
-            if (chkAutoScrollStatus.Checked)
-            {
-                txtStatus.AppendText(newLine ? (_text + Environment.NewLine) : _text);
-                caret = txtStatus.SelectionStart;
-            }
+            txtStatus.AppendText(newLine ? (_text + Environment.NewLine) : _text);
+            
+            if (newLine)
+                Debug.WriteLine(_text);
             else
-            {
-                caret = txtStatus.SelectionStart;
-                txtStatus.Text += newLine ? (_text + Environment.NewLine) : _text;
-                txtStatus.SelectionStart = caret;
-                txtStatus.ScrollToCaret();
-            }
+                Debug.Write(_text);
         }
         
         private void ReadSettings()
@@ -1343,7 +1399,10 @@ SELECT base_schema_name, base_table_name, constraint_name, base_column_name, uni
             PostgreProvider = txtPostgreProvider.Text;
 
             int postgrePort = 0;
-            PostgrePort = int.TryParse(txtPostgrePort.Text, out postgrePort) ? postgrePort : 5432;            
+            PostgrePort = int.TryParse(txtPostgrePort.Text, out postgrePort) ? postgrePort : 5432;
+
+            int fetchRowsTmp = 0;
+            fetchRows = int.TryParse(txtFetchRows.Text, out fetchRowsTmp) ? fetchRowsTmp : 100000;
         }
 
         private bool CheckSqlServerConnection(string connectionStringSqlServer)
