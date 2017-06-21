@@ -28,7 +28,9 @@ namespace SqlToPostgre
      * */
     public partial class Main : Form
     {
-        private readonly BackgroundWorker _bw = new BackgroundWorker();
+        private readonly BackgroundWorker _convertWorker = new BackgroundWorker();
+        private readonly BackgroundWorker _executeWorker = new BackgroundWorker();
+
         private CancellationTokenSource tokenSource;
 
         public string SQLServerAddress = "192.168.0.1";
@@ -56,8 +58,28 @@ namespace SqlToPostgre
 
             SqlServerTypes.Utilities.LoadNativeAssemblies(AppDomain.CurrentDomain.BaseDirectory);
 
-            _bw.DoWork += DoConvert;
-            _bw.RunWorkerCompleted += BwRunWorkerCompleted;
+            _convertWorker.DoWork += DoConvert;
+            _convertWorker.RunWorkerCompleted += _convertWorker_RunWorkerCompleted; ;
+
+            _executeWorker.DoWork += DoExecute;
+            _executeWorker.RunWorkerCompleted += _executeWorker_RunWorkerCompleted;
+        }
+
+        private void _convertWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        {
+            btnConvert.Enabled = true;
+            btnExecutePostgreCommand.Enabled = true;
+
+            btnCancelConvertion.Visible = false;
+            progressBar.Hide();
+        }
+
+        private void _executeWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        {
+            btnConvert.Enabled = true;
+            btnExecutePostgreCommand.Enabled = true;
+            
+            progressBar.Hide();
         }
 
         #region events
@@ -95,14 +117,17 @@ namespace SqlToPostgre
         private void btnConvert_Click(object sender, EventArgs e)
         {
             tokenSource = new CancellationTokenSource();
+
             btnConvert.Enabled = false;
+            btnExecutePostgreCommand.Enabled = false;
             btnCancelConvertion.Visible = true;
+
             progressBar.Show();
             txtStatus.Text = "";
             ReadSettings();
 
-            _bw.WorkerSupportsCancellation = true;
-            _bw.RunWorkerAsync();
+            _convertWorker.WorkerSupportsCancellation = true;
+            _convertWorker.RunWorkerAsync();
         }
 
         private void DoConvert(object sender, DoWorkEventArgs doWorkEventArgs)
@@ -145,17 +170,31 @@ namespace SqlToPostgre
             }
         }
         
-        private void btnCancelConvertion_Click(object sender, EventArgs e)
+        private void DoExecute(object sender, DoWorkEventArgs doWorkEventArgs)
         {
-            _bw.CancelAsync();
-            tokenSource.Cancel();
+            var connectionStringPostgreSql = GetConnectionString(PostgresServerAddress, PostgreDbName, PostgreUser, PostgrePass, PostgreProvider, PostgrePort);
+            var postgreCommand = txtPostgreCommand.Text;
+
+            try
+            {
+                if (txtPostgreCommand.Text != "")
+                {
+                    if (ExecuteSqlScript(connectionStringPostgreSql, postgreCommand))
+                    {
+                        StatusWriteLine("Comanda sql a fost rulata cu succes in POSTGRESQL.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusWriteLine("Eroare la verificarea conexiunii Postgre : " + ex.Message);
+            }
         }
 
-        private void BwRunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        private void btnCancelConvertion_Click(object sender, EventArgs e)
         {
-            btnConvert.Enabled = true;
-            btnCancelConvertion.Visible = false;
-            progressBar.Hide();
+            _convertWorker.CancelAsync();
+            tokenSource.Cancel();
         }
         
         private void btnClearStatus_Click(object sender, EventArgs e)
@@ -164,6 +203,17 @@ namespace SqlToPostgre
             {
                 txtStatus.Text = "";
             }
+        }
+        
+        private void btnExecutePostgreCommand_Click(object sender, EventArgs e)
+        {
+            btnConvert.Enabled = false;
+            btnExecutePostgreCommand.Enabled = false;
+            
+            progressBar.Show();
+            ReadSettings();
+
+            _executeWorker.RunWorkerAsync();
         }
 
         #endregion
@@ -461,7 +511,7 @@ namespace SqlToPostgre
                                 StatusWriteLine(string.Format("ERROR ON BULK INSERT IN TABLE '{0}' : {1}", pgTablename, ex.Message));
                             }
 
-                            if (_bw.CancellationPending)
+                            if (_convertWorker.CancellationPending)
                             {
                                 return "Aborted";
                             }

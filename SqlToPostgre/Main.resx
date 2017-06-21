@@ -117,4 +117,32 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="txtPostgreCommand.Text" xml:space="preserve">
+    <value>DROP TABLE IF EXISTS dbo.poi2;
+
+CREATE TABLE dbo.poi2
+(
+  id bigserial NOT NULL,
+  name character varying(250),
+  street character varying(250),
+  city character varying(50),
+  county character varying(50),
+  country character varying(50),
+  zipcode character varying(50),
+  shapejson text,
+  color character varying(50),
+  shape geography,
+  type character varying(50),
+  customerid bigint,
+  CONSTRAINT poi2_pkey PRIMARY KEY (id)
+)
+WITH (
+  OIDS=FALSE
+);
+ALTER TABLE dbo.poi2
+  OWNER TO postgres;
+
+INSERT INTO dbo.poi2
+SELECT id, name, street, city, county, country, zipcode, shapejson, color, ST_GeographyFromText(shape), type, customerid FROM dbo.poi;</value>
+  </data>
 </root>
